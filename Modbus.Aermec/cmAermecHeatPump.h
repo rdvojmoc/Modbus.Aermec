@@ -3,13 +3,12 @@
 
 class cmAermecHeatPump {
   
-    static const uint8_t REGIME_AUTO = 0;
-    static const uint8_t REGIME_MANUAL = 1;
-    static const uint8_t REGIME_SERVICE = 2;
-    
     private:
     
     protected:
+      static const uint8_t REGIME_AUTO = 0;
+      static const uint8_t REGIME_MANUAL = 1;
+      static const uint8_t REGIME_SERVICE = 2;
       /** 
       Constructor is protected to prevent directly creating cmAermecHeatPump objects
       */
