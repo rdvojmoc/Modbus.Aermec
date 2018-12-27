@@ -13,18 +13,27 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
       bool _oldModeXS;
       float _oldTempSP;
       long lastReadTime = 0;
-      long currentTime = 0;
+      long lastReadRetryTime = 0;
+      long lastWriteRetryTime = 0;
+      long currentReadTime = 0;
+      long currentWriteTime = 0;
 
       uint16_t scaleValue(float value, uint8_t factor) {
         return value * factor;  
       }
+
     protected:
       static const float DEF_MAN_TEMPSP = -1000;
 
       /**
-      Define time span in ms in which read of the control module state will be preformed
+      Defines time span in ms in which read of the control module state will be done
       */
       static const long READ_STATE_TIME = 1000;
+
+      /**
+      Defines time span in ms in which write or read transaction will be repeated
+      */
+      static const long RETRY_TIME = 60000;
       
       uint8_t _slaveId;
       
@@ -42,12 +51,14 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
       }
       
       /**
+      Write high state to _dere pin before Modbus transaction - ModbusMaster library need this for correct behavior
       */
       virtual void preTransmission(){
           digitalWrite(_dere, 1);
       };
 
       /**
+      Write low state to _dere pin after Modbus transaction - ModbusMaster library need this for correct behavior
       */
       virtual void postTransmission(){
           digitalWrite(_dere, 0);
@@ -69,6 +80,15 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
           }
 
           return tempSP;
+      }
+
+      virtual bool isModbusTransactionSuccessful(uint8_t code){
+        if(code == _node.ku8MBSuccess){
+          return true;
+        }
+        else {
+          return false;
+        }
       }
       
     public:
@@ -118,12 +138,21 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
       float MinWinterTempSP = 7;
 
       /**
-      
+      Register addresses as defined for ANKI type heat pump - consult documentation for addresses that applies for other devices
       */
+      //holding registers
       uint16_t OnOffRegisterAddress = 0x0000;
       uint16_t ModeRegisterAddress = 0x0001;
       uint16_t SummerTempSPRegisterAddress = 41;
       uint16_t WinterTempSPRegisterAddress = 39;
+      //coli registers
+      uint16_t AlarmIndicationRegisterAddress = 4;
+      
+      /**
+      
+      */
+      bool AlarmRemote;
+      
       
       cmAermecHeatPumpModbus(uint8_t slaveId, uint8_t dere){
         _slaveId = slaveId;
@@ -153,7 +182,7 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
       */
       virtual void process(int regime){
 
-        readState();
+        handleReadState();
         
         //call base method before writing to ouputs
         cmAermecHeatPump::process(regime);
@@ -172,48 +201,63 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
           }
         }
         
-        writeState();
-        
-//        // slave: read (6) 16-bit registers starting at register 2 to RX buffer
-//        result = _node.readHoldingRegisters(2, 6);
-//        
-//        // do something with data if read is successful
-//        if (result == _node.ku8MBSuccess)
-//        {
-//          uint8_t j = 0;
-//          uint16_t data[6];
-//          for (j = 0; j < 6; j++)
-//          {
-//            data[j] = _node.getResponseBuffer(j);
-//            Serial.print(data[j]);
-//          }
-//        }
-//        Serial.println(result);
+        handleWriteState();
       }
 
       /**
-      Method reads new state from MODBUS enabled heat pump
+      */
+      virtual void handleReadState(){
+        currentReadTime = millis();
+        if(!isModbusTransactionSuccessful(ReadResultCode)){
+          if(currentReadTime - lastReadRetryTime > RETRY_TIME) {
+            readState();
+            Serial.print("Read done. Time since last read: ");
+            Serial.println(currentReadTime - lastReadRetryTime);
+            lastReadRetryTime = currentReadTime;
+          }
+        }
+        else{
+         if(currentReadTime - lastReadTime > READ_STATE_TIME ){
+            readState();
+            Serial.print("Read done. Time since last read: ");
+            Serial.println(currentReadTime - lastReadTime);
+            lastReadTime = currentReadTime;
+         }
+        }
+
+        
+      }
+
+      /**
+      Method reads new state from MODBUS enabled heat pump - override this method in a new class if you want to change what is read from the heat pump
       */
       virtual void readState(){
         //read registers from control module (heat pump)
-        currentTime = millis();
-        if(currentTime - lastReadTime > READ_STATE_TIME){
-          //read state from the heat pump
-          ReadResultCode = _node.readCoils(0, 7);
-          if (ReadResultCode == _node.ku8MBSuccess){
-            Serial.println(bitRead(_node.getResponseBuffer(0), 3));
-            Serial.println(bitRead(_node.getResponseBuffer(0), 4));
-            Serial.println(bitRead(_node.getResponseBuffer(0), 5));
-            Serial.println(bitRead(_node.getResponseBuffer(0), 6));
-          }
-          else {
-          }
-          Serial.print("Read done. Time since last read: ");
-          Serial.println(currentTime - lastReadTime);
-          lastReadTime = currentTime;
+        ReadResultCode = _node.readCoils(0, 7);
+        
+        //in case of successful read set boolean values that have been read
+        if (isModbusTransactionSuccessful(ReadResultCode)){
+          AlarmRemote = bitRead(_node.getResponseBuffer(AlarmIndicationRegisterAddress / 8), (AlarmIndicationRegisterAddress % 8) - 1);
+          Serial.println(AlarmRemote);
         }
+                  
        }
 
+       virtual void handleWriteState(){
+        currentWriteTime = millis();
+        if(!isModbusTransactionSuccessful(WriteResultCode)){
+          if(currentWriteTime - lastWriteRetryTime > RETRY_TIME) {
+            writeState();
+            Serial.print("Retry write... ");
+            Serial.println(currentWriteTime - lastWriteRetryTime);
+            lastWriteRetryTime = currentWriteTime;
+          }
+        }
+        else{
+          writeState();
+        }
+       }
+      
        /**
        Method writes new state to MODBUS enabled heat pump
        To optimize writing over MODBUS rembmer old state to compere it with new state
@@ -224,7 +268,9 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
         if(_oldXS != XS | firstChange) {
            WriteResultCode = _node.writeSingleCoil(OnOffRegisterAddress, XS);
            //save current state to old state
-           _oldXS = XS;
+           if(isModbusTransactionSuccessful(WriteResultCode)) {
+              _oldXS = XS;
+           }
         }
 
         if(_oldModeXS != ModeXS | firstChange) {
