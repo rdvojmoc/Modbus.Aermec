@@ -90,6 +90,107 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
           return false;
         }
       }
+
+      
+      /**
+      Method implements retry logic when reading and periodic reads defined by READ_STATE_TIME
+      */
+      virtual void handleReadState(){
+        currentReadTime = millis();
+        if(!isModbusTransactionSuccessful(ReadResultCode)){
+          if(currentReadTime - lastReadRetryTime > RETRY_TIME) {
+            readState();
+            Serial.print("Read done. Time since last read: ");
+            Serial.println(currentReadTime - lastReadRetryTime);
+            lastReadRetryTime = currentReadTime;
+          }
+        }
+        else{
+         if(currentReadTime - lastReadTime > READ_STATE_TIME ){
+            readState();
+            Serial.print("Read done. Time since last read: ");
+            Serial.println(currentReadTime - lastReadTime);
+            lastReadTime = currentReadTime;
+         }
+        }
+
+        
+      }
+
+      /**
+      Method reads new state from MODBUS enabled heat pump - override this method in a new class if you want to change what is read from the heat pump
+      */
+      virtual void readState(){
+        //read registers from control module (heat pump)
+        ReadResultCode = _node.readCoils(0, 7);
+        
+        //in case of successful read set boolean values that have been read
+        if (isModbusTransactionSuccessful(ReadResultCode)){
+          AlarmRemote = bitRead(_node.getResponseBuffer(AlarmIndicationRegisterAddress / 8), (AlarmIndicationRegisterAddress % 8) - 1);
+          Serial.println(AlarmRemote);
+        }
+                  
+       }
+       
+      /**
+      Method implements retry logic when writing is not successful or call writeState
+      */
+       virtual void handleWriteState(){
+        currentWriteTime = millis();
+        if(!isModbusTransactionSuccessful(WriteResultCode)){
+          if(currentWriteTime - lastWriteRetryTime > RETRY_TIME) {
+            writeState();
+            Serial.print("Retry write... ");
+            Serial.println(currentWriteTime - lastWriteRetryTime);
+            lastWriteRetryTime = currentWriteTime;
+          }
+        }
+        else{
+          writeState();
+        }
+       }
+      
+       /**
+       Method writes new state to MODBUS enabled heat pump - override this method in a new class if you want to change what is written to the heat pump
+       To optimize writing over MODBUS rembmer old state to compere it with new state
+       */
+       virtual void writeState(){
+               
+        //detect state change and write it to the registers
+        if(_oldXS != XS | firstChange) {
+           WriteResultCode = _node.writeSingleCoil(OnOffRegisterAddress, XS);
+           //save current state to old state
+           if(isModbusTransactionSuccessful(WriteResultCode)) {
+              _oldXS = XS;
+           }
+        }
+
+        if(_oldModeXS != ModeXS | firstChange) {
+           WriteResultCode = _node.writeSingleCoil(ModeRegisterAddress, ModeXS);
+           //save current state to old state
+          _oldModeXS = ModeXS;
+        }
+
+        if(_oldTempSP != TempSP | firstChange)
+        {
+          //depending on the mode (winter/summer) decide to which register write the set point
+          if(ModeXS) 
+          {
+            //summer mode
+            WriteResultCode = _node.writeSingleRegister(SummerTempSPRegisterAddress, scaleValue(TempSP, 10));
+          }
+          else
+          {
+            //winter mode
+            WriteResultCode = _node.writeSingleRegister(WinterTempSPRegisterAddress, scaleValue(TempSP, 10));
+          }
+           //save current state to old state
+          _oldTempSP = TempSP;
+        }
+        
+        //try to write until first write is successfull
+        if(firstChange && WriteResultCode == 0 ) firstChange = false; 
+       }
       
     public:
       /**
@@ -204,101 +305,6 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
         handleWriteState();
       }
 
-      /**
-      */
-      virtual void handleReadState(){
-        currentReadTime = millis();
-        if(!isModbusTransactionSuccessful(ReadResultCode)){
-          if(currentReadTime - lastReadRetryTime > RETRY_TIME) {
-            readState();
-            Serial.print("Read done. Time since last read: ");
-            Serial.println(currentReadTime - lastReadRetryTime);
-            lastReadRetryTime = currentReadTime;
-          }
-        }
-        else{
-         if(currentReadTime - lastReadTime > READ_STATE_TIME ){
-            readState();
-            Serial.print("Read done. Time since last read: ");
-            Serial.println(currentReadTime - lastReadTime);
-            lastReadTime = currentReadTime;
-         }
-        }
-
-        
-      }
-
-      /**
-      Method reads new state from MODBUS enabled heat pump - override this method in a new class if you want to change what is read from the heat pump
-      */
-      virtual void readState(){
-        //read registers from control module (heat pump)
-        ReadResultCode = _node.readCoils(0, 7);
-        
-        //in case of successful read set boolean values that have been read
-        if (isModbusTransactionSuccessful(ReadResultCode)){
-          AlarmRemote = bitRead(_node.getResponseBuffer(AlarmIndicationRegisterAddress / 8), (AlarmIndicationRegisterAddress % 8) - 1);
-          Serial.println(AlarmRemote);
-        }
-                  
-       }
-
-       virtual void handleWriteState(){
-        currentWriteTime = millis();
-        if(!isModbusTransactionSuccessful(WriteResultCode)){
-          if(currentWriteTime - lastWriteRetryTime > RETRY_TIME) {
-            writeState();
-            Serial.print("Retry write... ");
-            Serial.println(currentWriteTime - lastWriteRetryTime);
-            lastWriteRetryTime = currentWriteTime;
-          }
-        }
-        else{
-          writeState();
-        }
-       }
-      
-       /**
-       Method writes new state to MODBUS enabled heat pump
-       To optimize writing over MODBUS rembmer old state to compere it with new state
-       */
-       virtual void writeState(){
-               
-        //detect state change and write it to the registers
-        if(_oldXS != XS | firstChange) {
-           WriteResultCode = _node.writeSingleCoil(OnOffRegisterAddress, XS);
-           //save current state to old state
-           if(isModbusTransactionSuccessful(WriteResultCode)) {
-              _oldXS = XS;
-           }
-        }
-
-        if(_oldModeXS != ModeXS | firstChange) {
-           WriteResultCode = _node.writeSingleCoil(ModeRegisterAddress, ModeXS);
-           //save current state to old state
-          _oldModeXS = ModeXS;
-        }
-
-        if(_oldTempSP != TempSP | firstChange)
-        {
-          //depending on the mode (winter/summer) decide to which register write the set point
-          if(ModeXS) 
-          {
-            //summer mode
-            WriteResultCode = _node.writeSingleRegister(SummerTempSPRegisterAddress, scaleValue(TempSP, 10));
-          }
-          else
-          {
-            //winter mode
-            WriteResultCode = _node.writeSingleRegister(WinterTempSPRegisterAddress, scaleValue(TempSP, 10));
-          }
-           //save current state to old state
-          _oldTempSP = TempSP;
-        }
-        
-        //try to write until first write is successfull
-        if(firstChange && WriteResultCode == 0 ) firstChange = false; 
-       }
        
 };
 #endif

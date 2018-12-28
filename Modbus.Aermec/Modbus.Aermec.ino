@@ -1,10 +1,10 @@
 #include "cmAermecHeatPumpModbus.h"
 
 //cmAermecHeatPumpModbus coolingHeatPump(1, 8);
-cmAermecHeatPumpModbus coolingHeatPump2(1, 10);
+cmAermecHeatPumpModbus heatPump(1, 10);
 
 char incomingByte;
-int regime = 1;
+int regime = 1; // 0 = Auto, 1 = Manual, 2 = Service
 
 void setup()
 {
@@ -16,11 +16,11 @@ void setup()
   
   Serial.println("Starting...");
   //coolingHeatPump.begin(Serial2);
-  coolingHeatPump2.MinWinterTempSP = -5;
-  coolingHeatPump2.MaxWinterTempSP = 18;
-  coolingHeatPump2.MinSummerTempSP = 25;
-  coolingHeatPump2.MaxSummerTempSP = 45;
-  coolingHeatPump2.begin(Serial3);
+  heatPump.MinWinterTempSP = -5;
+  heatPump.MaxWinterTempSP = 18;
+  heatPump.MinSummerTempSP = 25;
+  heatPump.MaxSummerTempSP = 45;
+  heatPump.begin(Serial3);
   Serial.println("Started.");
 }
 
@@ -34,21 +34,21 @@ void loop()
     //Manual ON/OFF command
     switch(incomingByte)
     {
-      case '1': coolingHeatPump2.ManualOn = true; break;
-      case '2': coolingHeatPump2.ManualOn = false; break;
-      case '3': coolingHeatPump2.ManualModeOn = true; break;
-      case '4': coolingHeatPump2.ManualModeOn = false; break;
-      case '5': coolingHeatPump2.ManualTempSP = 25; break;
-      case '6': coolingHeatPump2.ManualTempSP = -1000; break;
-      case '7': coolingHeatPump2.ManualTempSP = 32.2; break;
-      case '8': coolingHeatPump2.ManualTempSP = -4.2; break;
-      case '9': coolingHeatPump2.ManualTempSP = 10; break;
+      case '1': heatPump.ManualOn = true; break;
+      case '2': heatPump.ManualOn = false; break;
+      case '3': heatPump.ManualModeOn = true; break;
+      case '4': heatPump.ManualModeOn = false; break;
+      case '5': heatPump.ManualTempSP = 25; break;
+      case '6': heatPump.ManualTempSP = -1000; break;
+      case '7': heatPump.ManualTempSP = 32.2; break;
+      case '8': heatPump.ManualTempSP = -4.2; break;
+      case '9': heatPump.ManualTempSP = 10; break;
       
     }
     
   }
   //coolingHeatPump.process(regime);
-  coolingHeatPump2.process(regime);
+  heatPump.process(regime);
 
   //Serial.println(millis()-stopwatch);
 }
