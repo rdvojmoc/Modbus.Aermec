@@ -18,23 +18,23 @@ uint8_t slaveId = 1;
 uint8_t derePin = 10;
 uint8_t regime = 1; // 0 = Auto, 1 = Manual, 2 = Service => In Manual regime control module can be controled by user
 
-cmAermecHeatPumpModbus coolingHeatPump2(slaveId, derePin);
+cmAermecHeatPumpModbus heatPump(slaveId, derePin);
 
 void setup()
 {
   Serial3.begin(19200, SERIAL_8N2); //SERIAL_8N2 BAUD_RATE=19200, PARITY = NONE, DATA_BITS = 8, STOP_BITS = 2 as defined in MOD485K.pdf => Modaer protocol
   //Define temperature setpoint limits as is specified for your device
-  coolingHeatPump2.MinWinterTempSP = -5;
-  coolingHeatPump2.MaxWinterTempSP = 18;
-  coolingHeatPump2.MinSummerTempSP = 25;
-  coolingHeatPump2.MaxSummerTempSP = 45;
+  heatPump.MinWinterTempSP = -5;
+  heatPump.MaxWinterTempSP = 18;
+  heatPump.MinSummerTempSP = 25;
+  heatPump.MaxSummerTempSP = 45;
   
-  coolingHeatPump2.begin(Serial3);
+  heatPump.begin(Serial3);
 }
 
 void loop()
 {
-  coolingHeatPump2.process(regime);
+  heatPump.process(regime);
 }
 ```
 
