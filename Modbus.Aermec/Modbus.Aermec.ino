@@ -40,11 +40,8 @@ void loop()
       case '7': heatPump.ManualTempSP = 32.2; break;
       case '8': heatPump.ManualTempSP = -4.2; break;
       case '9': heatPump.ManualTempSP = 10; break;
-      
     }
-    
   }
-
   
   heatPump.process(regime);
 
