@@ -7,6 +7,7 @@ What is supported:
 - Select mode Winter/Summer
 - Set temperature setpoint 
 - Read alarm status indication
+- Read outside temperature
 
 In case of a Modbus communication failure periodic (60s) retry logic is implemented for read and write.
 
