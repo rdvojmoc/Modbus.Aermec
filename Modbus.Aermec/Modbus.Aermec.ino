@@ -49,6 +49,8 @@ void loop()
   if(stopwatch - lastPrintTime > 1000){
       lastPrintTime = stopwatch;
       Serial.println("########################################");
+      Serial.print("Mode: ");
+      Serial.print(heatPump.ModeXS);
       Serial.print("Alarm: ");
       Serial.println(heatPump.Alarm);
       Serial.print("Alarm Remote: ");
@@ -56,6 +58,8 @@ void loop()
       Serial.print("Outside Temperature: ");
       Serial.print(heatPump.OutsideTemperature);
       Serial.println(" °C");
+      Serial.print("XS: ");
+      Serial.print(heatPump.XS);
       Serial.println("########################################");
   }
   

@@ -30,7 +30,7 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
       }
 
     protected:
-      static const float DEF_MAN_TEMPSP = -1000;
+      static constexpr float DEF_MAN_TEMPSP = -1000.0f;
 
       /**
       Defines time span in ms in which read of the control module state will be done
@@ -134,6 +134,7 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
         //in case of successful read set boolean values that have been read
         if (isModbusTransactionSuccessful(ReadResultCode)){
           AlarmRemote = bitRead(_node.getResponseBuffer(AlarmIndicationRegisterAddress / 8), (AlarmIndicationRegisterAddress % 8) - 1);
+          Serial.println(bitRead(_node.getResponseBuffer(0), 0));
         }
         
         ReadResultCode = _node.readHoldingRegisters(0,33);
@@ -168,6 +169,7 @@ class cmAermecHeatPumpModbus : public cmAermecHeatPump{
         //detect state change and write it to the registers
         if(_oldXS != XS | firstChange) {
            WriteResultCode = _node.writeSingleCoil(OnOffRegisterAddress, XS);
+           Serial.println("XS writen");
            //save current state to old state
            if(isModbusTransactionSuccessful(WriteResultCode)) {
               _oldXS = XS;
