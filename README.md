@@ -1,7 +1,7 @@
 # Modbus.Aermec
 Modbus MOD485K (Modaer) implementation for Aermec heat pumps on Arduino. Dependant on ModbusMaster library.
 
-Implementation of Modbus communication with Aermec ANKI 025 Heat Pump on Arduino Mega over Serial3.
+Implementation of Modbus communication with Aermec ANKI 025 Heat Pump on Arduino Mega or Arduino Due over Serial3.
 What is supported:
 - Heat pump On/Off
 - Select mode Winter/Summer
